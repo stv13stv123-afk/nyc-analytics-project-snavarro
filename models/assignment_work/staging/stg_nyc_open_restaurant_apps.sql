@@ -33,7 +33,7 @@ cleaned AS (
         -- Location - address details
         CAST(bulding_number AS STRING) AS building_number,
         
-        -- Location - clean zip code (using your logic from 311 model)
+        -- Location - clean zip code
         CASE
             WHEN UPPER(TRIM(CAST(zip AS STRING))) IN ('N/A', 'NA') THEN NULL
             WHEN UPPER(TRIM(CAST(zip AS STRING))) = 'ANONYMOUS' THEN 'Anonymous'
@@ -72,13 +72,14 @@ cleaned AS (
     FROM source
 
     -- Filters
+    -- Note: WHERE can still see the original names because it runs BEFORE the SELECT
     WHERE unique_key IS NOT NULL
     AND time_of_submission IS NOT NULL
-    -- NYC Open Restaurants started in 2020, but keeping your 7-year filter for safety
     AND CAST(time_of_submission AS DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 YEAR)
 
-    -- Deduplicate on unique_key
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY unique_key ORDER BY time_of_submission DESC) = 1
+    -- Deduplicate
+    -- Note: QUALIFY must use the NEW ALIASES because it runs AFTER the SELECT
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY application_id ORDER BY submitted_at DESC) = 1
 )
 
 SELECT * FROM cleaned
