@@ -1,95 +1,77 @@
--- Clean and standardize 311 DOT service request data
--- One row per service request
-
+-- Clean and standardize NYC Open Restaurant Applications data
 WITH source AS (
-   SELECT * FROM {{ source('raw', 'source_dot_service_requests_history') }}
-), -- Easier to refer to the dbt reference to a long name table this way
+    SELECT * FROM {{ source('raw', 'source_nyc_open_restaurant_apps') }}
+),
 
 cleaned AS (
-   SELECT
-       -- Get all columns from source, except ones we're transforming below
-       -- To do cleaning on them or explicitly cast them as types just in case
-       * EXCEPT (
-           unique_key,
-           created_date,
-           closed_date,
-           agency,
-           agency_name,
-           complaint_type,
-           descriptor,
-           status,
-           incident_zip,
-           borough,
-           incident_address,
-           street_name,
-           cross_street_1,
-           cross_street_2,
-           latitude,
-           longitude,
-           open_data_channel_type
-       ),
+    SELECT
+        -- 1. Exclude the raw columns we are transforming or renaming
+        * EXCEPT (
+            unique_key,
+            time_of_submission,
+            bulding_number,
+            zip,
+            borough,
+            latitude,
+            longitude,
+            roadway_dimensions_area,
+            roadway_dimensions_length,
+            roadway_dimensions_width,
+            sidewalk_dimensions_area,
+            sidewalk_dimensions_length,
+            sidewalk_dimensions_width
+        ),
 
-       -- Identifiers
-       CAST(unique_key AS STRING) AS request_id,
+        -- 2. Identifiers & Timestamps
+        CAST(unique_key AS STRING) AS application_id,
+        CAST(time_of_submission AS TIMESTAMP) AS submitted_at,
 
-       -- Date/Time
-       CAST(created_date AS TIMESTAMP) AS created_date,
-       CAST(closed_date AS TIMESTAMP) AS closed_date,
+        -- 3. Location cleaning (Addressing the 'bulding' typo in source)
+        CAST(bulding_number AS STRING) AS building_number,
+        
+        CASE
+            WHEN UPPER(TRIM(CAST(zip AS STRING))) IN ('N/A', 'NA') THEN NULL
+            WHEN UPPER(TRIM(CAST(zip AS STRING))) = 'ANONYMOUS' THEN 'Anonymous'
+            WHEN LENGTH(CAST(zip AS STRING)) = 5 THEN CAST(zip AS STRING)
+            WHEN LENGTH(CAST(zip AS STRING)) = 9 THEN CAST(zip AS STRING)
+            WHEN LENGTH(CAST(zip AS STRING)) = 10 
+                AND REGEXP_CONTAINS(CAST(zip AS STRING), r'^\d{5}-\d{4}') 
+            THEN CAST(zip AS STRING)
+            ELSE NULL
+        END AS zip_code,
 
-       -- Request details
-       CAST(agency AS STRING) AS agency,
-       CAST(agency_name AS STRING) AS agency_name,
-       CAST(complaint_type AS STRING) AS complaint_type,
-       CAST(descriptor AS STRING) AS descriptor,
-       UPPER(TRIM(CAST(status AS STRING))) AS status,
+        CASE
+            WHEN UPPER(TRIM(borough)) IN ('MANHATTAN', 'NEW YORK COUNTY') THEN 'Manhattan'
+            WHEN UPPER(TRIM(borough)) IN ('BRONX', 'THE BRONX') THEN 'Bronx'
+            WHEN UPPER(TRIM(borough)) IN ('BROOKLYN', 'KINGS COUNTY') THEN 'Brooklyn'
+            WHEN UPPER(TRIM(borough)) IN ('QUEENS', 'QUEEN', 'QUEENS COUNTY') THEN 'Queens'
+            WHEN UPPER(TRIM(borough)) IN ('STATEN ISLAND', 'RICHMOND COUNTY') THEN 'Staten Island'
+            ELSE 'UNKNOWN or CITYWIDE'
+        END AS borough,
 
-       -- Location - clean zip code
-       CASE
-           WHEN UPPER(TRIM(CAST(incident_zip AS STRING))) IN ('N/A', 'NA') THEN NULL
-           WHEN UPPER(TRIM(CAST(incident_zip AS STRING))) = 'ANONYMOUS' THEN 'Anonymous'
-           WHEN LENGTH(CAST(incident_zip AS STRING)) = 5 THEN CAST(incident_zip AS STRING)
-           WHEN LENGTH(CAST(incident_zip AS STRING)) = 9 THEN CAST(incident_zip AS STRING)
-           WHEN LENGTH(CAST(incident_zip AS STRING)) = 10
-               AND REGEXP_CONTAINS(CAST(incident_zip AS STRING), r'^\d{5}-\d{4}')
-           THEN CAST(incident_zip AS STRING)
-           ELSE NULL
-       END AS incident_zip,
+        CAST(latitude AS DECIMAL) AS latitude,
+        CAST(longitude AS DECIMAL) AS longitude,
 
-       -- Location - standardized borough
-       CASE
-           WHEN UPPER(TRIM(borough)) IN ('MANHATTAN', 'NEW YORK COUNTY') THEN 'Manhattan'
-           WHEN UPPER(TRIM(borough)) IN ('BRONX', 'THE BRONX') THEN 'Bronx'
-           WHEN UPPER(TRIM(borough)) IN ('BROOKLYN', 'KINGS COUNTY') THEN 'Brooklyn'
-           WHEN UPPER(TRIM(borough)) IN ('QUEENS', 'QUEEN', 'QUEENS COUNTY') THEN 'Queens'
-           WHEN UPPER(TRIM(borough)) IN ('STATEN ISLAND', 'RICHMOND COUNTY') THEN 'Staten Island'
-           ELSE 'UNKNOWN or CITYWIDE'
-       END AS borough,
+        -- 4. Dimensions
+        CAST(roadway_dimensions_area AS DECIMAL) AS roadway_area,
+        CAST(roadway_dimensions_length AS DECIMAL) AS roadway_length,
+        CAST(roadway_dimensions_width AS DECIMAL) AS roadway_width,
+        CAST(sidewalk_dimensions_area AS DECIMAL) AS sidewalk_area,
+        CAST(sidewalk_dimensions_length AS DECIMAL) AS sidewalk_length,
+        CAST(sidewalk_dimensions_width AS DECIMAL) AS sidewalk_width,
 
-       CAST(incident_address AS STRING) AS incident_address,
-       CAST(street_name AS STRING) AS street_name,
-       CAST(cross_street_1 AS STRING) AS cross_street_1,
-       CAST(cross_street_2 AS STRING) AS cross_street_2,
-       CAST(latitude AS DECIMAL) AS latitude,
-       CAST(longitude AS DECIMAL) AS longitude,
+        -- Metadata
+        CURRENT_TIMESTAMP() AS _stg_loaded_at
 
-       -- Clearer col name as well for this one
-       CAST(open_data_channel_type AS STRING) AS method_of_submission,
+    FROM source
 
-       -- Metadata
-       CURRENT_TIMESTAMP() AS _stg_loaded_at
+    -- WHERE runs BEFORE the names are changed, so it uses source names
+    WHERE unique_key IS NOT NULL
+      AND time_of_submission IS NOT NULL
+      AND CAST(time_of_submission AS DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 YEAR)
 
-   FROM source
-
-   -- Filters
-   WHERE (agency = 'DOT' OR agency_name LIKE '%Transportation%')
-   AND unique_key IS NOT NULL
-   AND created_date IS NOT NULL
-   AND CAST(created_date AS DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 YEAR)
-   AND borough IS NOT NULL
-
-   -- Deduplicate
-   QUALIFY ROW_NUMBER() OVER (PARTITION BY unique_key ORDER BY created_date DESC) = 1
+    -- QUALIFY runs AFTER names are changed, so it MUST use the new aliases
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY application_id ORDER BY submitted_at DESC) = 1
 )
 
 SELECT * FROM cleaned
--- All should be part of this table: stg_nyc_311_dot
