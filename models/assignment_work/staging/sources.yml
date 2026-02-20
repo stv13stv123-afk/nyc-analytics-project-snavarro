@@ -89,8 +89,8 @@ sources:
             description: Nearby landmark or point of interest
       - name: source_nyc_open_restaurant_apps
         columns:
-          - name: unique_key
-            description: Unique ID for the service request
+          - name: object_id
+            description: Unique ID for the application
             tests:
               - unique
               - not_null

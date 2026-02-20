@@ -1,20 +1,18 @@
 -- Clean and standardize NYC Open Restaurant Applications data
--- One row per application
-
 WITH source AS (
     SELECT * FROM {{ source('raw', 'source_nyc_open_restaurant_apps') }}
 ),
 
 cleaned AS (
     SELECT
-        -- Get all columns from source, except ones we're transforming below
+        -- Use EXCEPT to exclude columns we are manually transforming
         * EXCEPT (
             unique_key,
             time_of_submission,
             restaurant_name,
             legal_business_name,
             doing_business_as_dba,
-            bulding_number,
+            building_number, -- Changed from 'bulding' to 'building'
             street,
             borough,
             zip,
@@ -26,7 +24,7 @@ cleaned AS (
         CAST(unique_key AS STRING) AS request_id,
 
         -- Date/Time
-        CAST(time_of_submission AS TIMESTAMP) AS time_of_submission,
+        SAFE_CAST(time_of_submission AS TIMESTAMP) AS time_of_submission,
 
         -- Restaurant details
         CAST(restaurant_name AS STRING) AS restaurant_name,
@@ -34,18 +32,15 @@ cleaned AS (
         CAST(doing_business_as_dba AS STRING) AS doing_business_as_dba,
 
         -- Location details
-        CAST(bulding_number AS STRING) AS building_number, -- Fixing typo from the raw source
+        CAST(building_number AS STRING) AS building_number,
         CAST(street AS STRING) AS street,
 
         -- Location - clean zip code
         CASE
             WHEN UPPER(TRIM(CAST(zip AS STRING))) IN ('N/A', 'NA') THEN NULL
             WHEN UPPER(TRIM(CAST(zip AS STRING))) = 'ANONYMOUS' THEN 'Anonymous'
-            WHEN LENGTH(CAST(zip AS STRING)) = 5 THEN CAST(zip AS STRING)
-            WHEN LENGTH(CAST(zip AS STRING)) = 9 THEN CAST(zip AS STRING)
-            WHEN LENGTH(CAST(zip AS STRING)) = 10
-                AND REGEXP_CONTAINS(CAST(zip AS STRING), r'^\d{5}-\d{4}')
-            THEN CAST(zip AS STRING)
+            WHEN LENGTH(REGEXP_EXTRACT(CAST(zip AS STRING), r'^(\d{5})')) = 5 
+                THEN REGEXP_EXTRACT(CAST(zip AS STRING), r'^(\d{5})')
             ELSE NULL
         END AS zip,
 
@@ -59,8 +54,8 @@ cleaned AS (
             ELSE 'UNKNOWN or CITYWIDE'
         END AS borough,
 
-        CAST(latitude AS DECIMAL) AS latitude,
-        CAST(longitude AS DECIMAL) AS longitude,
+        SAFE_CAST(latitude AS FLOAT64) AS latitude,
+        SAFE_CAST(longitude AS FLOAT64) AS longitude,
 
         -- Metadata
         CURRENT_TIMESTAMP() AS _stg_loaded_at
@@ -70,8 +65,8 @@ cleaned AS (
     -- Filters
     WHERE unique_key IS NOT NULL
     AND time_of_submission IS NOT NULL
-    AND CAST(time_of_submission AS DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 YEAR)
-    AND borough IS NOT NULL
+    -- Ensure we only pull the last 7 years of data
+    AND SAFE_CAST(time_of_submission AS DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 YEAR)
 
     -- Deduplicate
     QUALIFY ROW_NUMBER() OVER (PARTITION BY unique_key ORDER BY time_of_submission DESC) = 1
