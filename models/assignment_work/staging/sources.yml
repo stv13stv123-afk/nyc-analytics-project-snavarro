@@ -89,7 +89,7 @@ sources:
             description: Nearby landmark or point of interest
       - name: source_nyc_open_restaurant_apps
         columns:
-          - name: object_id
+          - name: objectid
             description: Unique ID for the application
             tests:
               - unique
