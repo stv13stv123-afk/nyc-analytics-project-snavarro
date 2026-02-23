@@ -36,8 +36,8 @@ cleaned AS (
         END AS borough,
 
         CASE
-            WHEN LENGTH(REGEXP_EXTRACT(CAST(incident_zip AS STRING), r'^(\d{5})')) = 5
-                THEN REGEXP_EXTRACT(CAST(incident_zip AS STRING), r'^(\d{5})')
+            WHEN LENGTH(REGEXP_EXTRACT(CAST(zip_code AS STRING), r'^(\d{5})')) = 5
+                THEN REGEXP_EXTRACT(CAST(zip_code AS STRING), r'^(\d{5})')
             ELSE NULL
         END AS zip_code,
 
@@ -51,7 +51,7 @@ cleaned AS (
         SAFE_CAST(number_of_motorist_injured AS INT64) AS count_motorists_injured,
         SAFE_CAST(number_of_motorist_killed AS INT64) AS count_motorists_killed,
         SAFE_CAST(number_of_pedestrians_injured AS INT64) AS count_pedestrians_injured,
-        SAFE_CAST(number of number_of_pedestrians_killed AS INT64) AS count_pedestrians_killed
+        SAFE_CAST(number_of_pedestrians_killed AS INT64) AS count_pedestrians_killed,
         
         CURRENT_TIMESTAMP() AS _stg_loaded_at
         

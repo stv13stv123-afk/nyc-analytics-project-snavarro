@@ -5,10 +5,10 @@ sources:
     database: steven-cis-9440
     schema: nyc_311_raw_data
     tables:
-      - name: source_nyc_collisions
+      - name: source_nyc_vehicle_collisions
         description: Motor vehicle collision data in NYC.
         columns:
-         - name: collission_id
+         - name: collision_id
            description: Unique ID for the crash
            tests:
             - unique
