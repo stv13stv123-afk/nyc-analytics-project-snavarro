@@ -1,0 +1,57 @@
+version: 2
+sources:
+  - name: raw
+    description: Raw data loaded from NYC Open Data
+    database: steven-cis-9440
+    scheme: nyc_311_raw_data
+    tables:
+      - name: source_nyc_collisions
+        description: Motor vehicle collision data in NYC.
+        columns:
+         - name: collission_id
+           description: Unique ID for the crash
+           tests:
+            - unique
+            - not_null
+         - name: crash_date
+           description: Date of the crash
+         - name: crash_time
+         - name: borough
+         - name: zip_code
+         - name: latitude
+         - name: longitude
+         - name: on_street_name
+         - name: off_street_name
+         - name: number_of_persons_injured
+         - name: number_of_persons_killed
+         - name: contributing_factor_vehicle_1
+         - name: vehicle_code1
+         - name: cross_street_name
+         - name: number_of_cyclist_injured
+         - name: number_of_cyclist_killed
+         - name: number_of_motorist_injured
+         - name: number_of_motorist_killed
+         - name: number_of_pedestrians_injured
+         - name: number_of_pedestrians_killed
+     
+      - name: nyc_service_request_from_2020
+        columns:
+          - name: unique_key
+            description: Unique identifier for the reequests
+            tests:
+             - unique
+             - not_null
+          - name: created_date
+          - name: closed_date
+          - name: agency
+          - name: agency_name
+          - name: complaint_type
+          - name: descriptor
+          - name: status
+          - name: borough
+          - name: incident_zip
+          - name: latitude
+          - name: longitude
+          - name: open_data_channel_type
+          - name: resolution_description
+          - name: street_name
