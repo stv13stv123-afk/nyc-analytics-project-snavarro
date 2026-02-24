@@ -7,6 +7,7 @@ fact_311 AS (
         {{dbt_utils.generate_surrogate_key(['CAST(created_date AS DATE)'])}} AS date_fk,
         {{dbt_utils.generate_surrogate_key(['borough', 'incident_zip'])}} AS location_fk,
         {{dbt_utils.generate_surrogate_key(['agency', 'complaint_type', 'descriptor'])}} AS complaint_type_fk,
+        {{dbt_utils.generate_surrogate_key(['EXTRACT(HOUR FROM created_date)']) }} as time_fk,
 
         request_id,
 
