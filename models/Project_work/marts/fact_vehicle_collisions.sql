@@ -8,7 +8,7 @@ fact_collisions AS (
 
         {{ dbt_utils.generate_surrogate_key(['CAST(crash_date AS DATE)'])}} AS date_fk,
         {{ dbt_utils.generate_surrogate_key(['borough', 'zip_code'])}} AS location_fk,
-
+        {{ dbt_utils.generate_surrogate_key(["EXTRACT(HOUR FROM PARSE_TIME('%H:%M', crash_time))"])}} AS time_fk,
         {{ dbt_utils.generate_surrogate_key(['contributing_factor_vehicle_1', 'vehicle_type_code1'])}} AS collision_detail_fk,
 
         collision_id,
